@@ -1,0 +1,5 @@
+
+google==3.0.0
+protobuf==4.25.1
+requests==2.31.0
+websocket-client==1.6.2
