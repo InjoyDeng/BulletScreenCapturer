@@ -1,9 +1,8 @@
 import gzip
 import re
-import requests
-from websocket import WebSocketApp
+import requests, websocket
 from capute import Caputre
-from douyin.protobuf import dy_pb2
+from douyin.protobuf.mapping import *
 
 class DouYin(Caputre):
     
@@ -21,16 +20,16 @@ class DouYin(Caputre):
             "cookie": f"ttwid={ttwid}",
             'user-agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
-        self.ws = WebSocketApp(wss,
+        self.ws = websocket.WebSocketApp(wss,
                         header=headers,
-                        on_open=self._on_open,
-                        on_message=self._on_message,
-                        on_error=self._on_error,
-                        on_close=self._on_close)
+                        on_open=self._ws_on_open,
+                        on_message=self._ws_on_message,
+                        on_error=self._ws_on_error,
+                        on_close=self._ws_on_close)
         try:
             self.ws.run_forever()
         except Exception:
-            self.ws.close()
+            self.stop()
             raise
         
     def _get_room_info(self):
@@ -58,73 +57,114 @@ class DouYin(Caputre):
         
         return ttwid, live_room_id
     
-    def _on_open(self, ws):
+    def _ws_on_open(self, ws):
         print("DouYin: WebSocket connection opened")
 
-    def _on_message(self, ws, message):
+    def _ws_on_message(self, ws, message):
         '''接收到消息'''
-        frame = dy_pb2.PushFrame()
-        frame.ParseFromString(message)
-        origin_bytes = gzip.decompress(frame.payload)
-        response = dy_pb2.Response()
-        response.ParseFromString(origin_bytes)
+        package = PushFrame().parse(message)
+        response = Response().parse(gzip.decompress(package.payload))
         
-        if response.needAck:
-            ack_pack = dy_pb2.PushFrame()
-            ack_pack.logId = frame.logId
-            ack_pack.payloadType = response.internalExt
-
-            self.ws.send(ack_pack.SerializeToString())
+        if response.need_ack:
+            ack = PushFrame(log_id=package.log_id,
+                            payload_type='ack',
+                            payload=response.internal_ext.encode('utf-8')
+                            ).SerializeToString()
+            ws.send(ack, websocket.ABNF.OPCODE_BINARY)
         
-        for msg in response.messagesList:
+        for msg in response.messages_list:
             method = msg.method
+
             if method == 'WebcastChatMessage':
+                # 聊天消息
                 self._parse_chat_msg(msg.payload)
+
             elif method == "WebcastGiftMessage":
+                # 礼物消息
                 self._parse_gift_msg(msg.payload)
-            elif method == "WebcastGiftMessage":
+
+            elif method == "WebcastLikeMessage":
+                # 点赞消息
                 self._parse_like_msg(msg.payload)
-            elif method == "WebcastGiftMessage":
+
+            elif method == "WebcastMemberMessage":
+                # 进入直播间消息
                 self._parse_member_msg(msg.payload)
 
-    def _on_error(self, ws, error):
+            elif method == "WebcastSocialMessage":
+                # 关注消息
+                self._parse_social_msg(msg.payload)
+
+            elif method == "WebcastRoomUserSeqMessage":
+                # 直播间统计
+                self._parse_room_user_seq_msg(msg.payload)
+
+            elif method == "WebcastFansclubMessage":
+                # 粉丝团消息
+                self._parse_fansclub_msg(msg.payload)
+
+            elif method == "WebcastControlMessage":
+                # 直播间状态消息
+                self._parse_control_msg(msg.payload)
+
+
+    def _ws_on_error(self, ws, error):
         print("DouYin: WebSocket error: ", error)
 
-    def _on_close(self, ws):
+    def _ws_on_close(self, ws):
         print("DouYin: WebSocket connection closed")
 
     def _parse_chat_msg(self, payload):
         '''聊天消息'''
-        message = dy_pb2.ChatMessage()
-        message.ParseFromString(payload)
-
-        user_name = message.user.nickName
+        message = ChatMessage().parse(payload)
+        user_name = message.user.nick_name
         content = message.content
         print(f"{user_name}: {content}")
 
     def _parse_gift_msg(self, payload):
         '''礼物消息'''
-        message = dy_pb2.GiftMessage()
-        message.ParseFromString(payload)
-
-        user_name = message.user.nickName
+        message = GiftMessage().parse(payload)
+        user_name = message.user.nick_name
         gift_name = message.gift.name
-        gift_cnt = message.comboCount
+        gift_cnt = message.combo_count
         print(f"{user_name} 送出了 {gift_name}x{gift_cnt}")
 
     def _parse_like_msg(self, payload):
         '''点赞消息'''
-        message = dy_pb2.LikeMessage()
-        message.ParseFromString(payload)
-
-        user_name = message.user.nickName
-        like_cnt = message.count
-        print(f"{user_name} 点了{like_cnt}个赞")
+        message = LikeMessage().parse(payload)
+        user_name = message.user.nick_name
+        count = message.count
+        print(f"{user_name} 点了{count}个赞")
 
     def _parse_member_msg(self, payload):
         '''进入直播间消息'''
-        message = dy_pb2.MemberMessage()
-        message.ParseFromString(payload)
-
-        user_name = message.user.nickName
+        message = MemberMessage().parse(payload)
+        user_name = message.user.nick_name
         print(f"{user_name} 进入了直播间")
+
+    def _parse_social_msg(self, payload):
+        '''关注消息'''
+        message = SocialMessage().parse(payload)
+        user_name = message.user.nick_name
+        print(f"{user_name} 关注了主播")
+
+    def _parse_room_user_seq_msg(self, payload):
+        '''直播间统计'''
+        message = RoomUserSeqMessage().parse(payload)
+        current = message.total
+        total = message.total_pv_for_anchor
+        print(f"当前观看人数: {current}, 累计观看人数: {total}")
+
+    def _parse_fansclub_msg(self, payload):
+        '''粉丝团消息'''
+        message = FansclubMessage().parse(payload)
+        content = message.content
+        print(f"粉丝团消息: {content}")
+
+    def _parse_control_msg(self, payload):
+        '''直播间状态消息'''
+        message = ControlMessage().parse(payload)
+
+        if message.status == 3:
+            print("直播间已结束")
+            self.stop()

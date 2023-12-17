@@ -1,8 +1,5 @@
 syntax = "proto3";
-
 package douyin;
-
-option go_package = "./protobuf";
 
 message Response {
   repeated Message messagesList = 1;
@@ -39,8 +36,8 @@ message ChatMessage {
   Image backgroundImage = 5;
   string fullScreenTextColor = 6;
   Image backgroundImageV2 = 7;
-  PublicAreaCommon publicAreaCommon = 8;
-  Image giftImage = 9;
+  PublicAreaCommon publicAreaCommon = 9;
+  Image giftImage = 10;
   uint64 agreeMsgId = 11;
   uint32 priorityLevel = 12;
   LandscapeAreaCommon landscapeAreaCommon = 13;
@@ -326,7 +323,6 @@ message LikeMessage {
   uint64 linkmicGuestUid = 9;
   string scene = 10;
   PicoDisplayInfo picoDisplayInfo = 11;
-
 }
 
 message SocialMessage {
@@ -509,7 +505,6 @@ message PushFrame {
   string payloadEncoding = 6;
   string payloadType = 7;
   bytes payload = 8;
-
 }
 
 message kk {
@@ -525,7 +520,6 @@ message SendMessageBody {
   uint32 messageType = 6;
   string ticket = 7;
   string clientMessageId = 8;
-
 }
 
 message ExtList {
@@ -575,7 +569,65 @@ message HeadersList {
   string value = 2;
 }
 
+message LiveShoppingMessage {
+  Common common = 1;
+  int32 msgType = 2;
+  int64  promotionId = 4;
+}
+
+message RoomStatsMessage {
+  Common common = 1;
+  string displayShort = 2;
+  string displayMiddle = 3;
+  string displayLong = 4;
+  int64  displayValue = 5;
+  int64  displayVersion = 6;
+  bool incremental = 7;
+  bool isHidden = 8;
+  int64 total = 9;
+  int64 displayType = 10;
+}
+
 enum CommentTypeTag {
   COMMENTTYPETAGUNKNOWN = 0;
   COMMENTTYPETAGSTAR = 1;
+}
+
+message ProductInfo {
+  int64 promotionId = 1;
+  int32 index = 2;
+  repeated int64 targetFlashUidsList = 3;
+  int64 explainType = 4;
+}
+message CategoryInfo {
+  int32 id = 1;
+  string name = 2;
+  repeated int64 promotionIdsList = 3;
+  string type = 4;
+  string uniqueIndex = 5;
+}
+
+message ProductChangeMessage {
+  Common common = 1;
+  int64 updateTimestamp = 2;
+  string updateToast = 3;
+  repeated ProductInfo updateProductInfoList = 4;
+  int64 total = 5;
+  repeated CategoryInfo updateCategoryInfoList = 8;
+}
+
+// from https://github.com/HaoDong108/DouyinBarrageGrab/blob/main/BarrageGrab/proto/message.proto
+// status = 3 下播
+message ControlMessage {
+    Common common = 1;
+    int32 status = 2;
+}
+
+// from https://github.com/HaoDong108/DouyinBarrageGrab/blob/main/BarrageGrab/proto/message.proto
+message FansclubMessage {
+	Common commonInfo = 1;
+	// 升级是1，加入是2
+	int32 type = 2;
+	string content = 3;
+	User user = 4;
 }
