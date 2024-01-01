@@ -1,10 +1,10 @@
 import gzip
 import re
 import requests, websocket
-from capute import Caputre
+from capture import Capture
 from douyin.protobuf.mapping import *
 
-class DouYin(Caputre):
+class DouYin(Capture):
     
     def start(self):
         ttwid, room_id = self._get_room_info()
