@@ -1,5 +1,4 @@
-import gzip
-import re
+import gzip, re, datetime, os
 import requests, websocket
 from capture import Capture
 from douyin.protobuf.mapping import *
@@ -45,13 +44,17 @@ class DouYin(Capture):
             response.raise_for_status()
         except Exception as err:
             print("DouYin: request the live url error: ", err)
-            return None, err
+            raise
 
         ttwid = response.cookies.get_dict().get("ttwid")
         match = re.search(r'roomId\\":\\"(\d+)\\"', response.text)
         if match is None or len(match.groups()) < 1:
-            print("DouYin: No match found for roomId")
-            return None, err
+            response_file = datetime.datetime.now().strftime("log/dy_roominfo_%Y%m%d%H%M%S") + ".log"
+            os.makedirs(os.path.dirname(response_file), exist_ok=True)
+            with open(response_file, "w") as f:
+                f.write(response.text)
+            print("DouYin: No match found for roomId, result of request for room information has been written to: " + response_file)
+            raise Exception("No match found for roomId")
 
         live_room_id = match.group(1)
         
